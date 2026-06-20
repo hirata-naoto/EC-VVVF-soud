@@ -16,7 +16,10 @@ constexpr int kTargetTxPin = 43;
 constexpr bool kLocalEcho = true;
 constexpr uint8_t kCellWidth = 12;
 constexpr uint8_t kCellHeight = 16;
+constexpr uint8_t kTabWidth = 8;
+constexpr size_t kMaxCsiBufferSize = 32;
 constexpr uint32_t kCursorBlinkMs = 500;
+constexpr uint32_t kLoopDelayMs = 2;
 constexpr uint16_t kDefaultForeground = TFT_GREEN;
 constexpr uint16_t kDefaultBackground = TFT_BLACK;
 }  // namespace
@@ -148,7 +151,7 @@ class TerminalView {
         }
         return;
       case '\t': {
-        uint16_t next_tab = static_cast<uint16_t>(((cursor_col_ / 8U) + 1U) * 8U);
+        uint16_t next_tab = static_cast<uint16_t>(((cursor_col_ / kTabWidth) + 1U) * kTabWidth);
         while (cursor_col_ < cols_ && cursor_col_ < next_tab) {
           putCharacter(' ');
         }
@@ -190,7 +193,7 @@ class TerminalView {
 
   void handleCsi(uint8_t byte) {
     if ((byte >= '0' && byte <= '9') || byte == ';' || byte == '?') {
-      if (csi_buffer_.size() < 32) {
+      if (csi_buffer_.size() < kMaxCsiBufferSize) {
         csi_buffer_.push_back(static_cast<char>(byte));
       }
       return;
@@ -228,9 +231,9 @@ class TerminalView {
         break;
       case 'H':
       case 'f': {
-        int row = params.size() > 0 ? std::max(params[0], 1) - 1 : 0;
-        int col = params.size() > 1 ? std::max(params[1], 1) - 1 : 0;
-        setCursor(static_cast<uint16_t>(row), static_cast<uint16_t>(col));
+        int target_row = params.size() > 0 ? std::max(params[0], 1) - 1 : 0;
+        int target_col = params.size() > 1 ? std::max(params[1], 1) - 1 : 0;
+        setCursor(static_cast<uint16_t>(target_row), static_cast<uint16_t>(target_col));
         break;
       }
       case 'J':
@@ -345,8 +348,14 @@ class TerminalView {
         TFT_BLUE, TFT_MAGENTA, TFT_CYAN, TFT_WHITE,
     };
     static constexpr uint16_t bright_colors[8] = {
-        0x7BEF, 0xFBEA, 0x87F0, 0xFFF0,
-        0x7D7C, 0xFD5F, 0x87FF, TFT_WHITE,
+        0x7BEF,   // bright black
+        0xFBEA,   // bright red
+        0x87F0,   // bright green
+        0xFFF0,   // bright yellow
+        0x7D7C,   // bright blue
+        0xFD5F,   // bright magenta
+        0x87FF,   // bright cyan
+        TFT_WHITE // bright white
     };
 
     uint16_t color = bright ? bright_colors[index % 8] : colors[index % 8];
@@ -501,7 +510,7 @@ class TerminalView {
     display_->fillRect(x, y, kCellWidth, kCellHeight, bg);
     display_->setTextColor(fg, bg);
     display_->setCursor(x, y);
-    display_->print(source.ch == '\0' ? ' ' : source.ch);
+    display_->print(source.ch);
   }
 
   void markCellDirty(uint16_t row) {
@@ -543,5 +552,5 @@ void loop() {
   }
 
   terminal_view.render();
-  delay(2);
+  delay(kLoopDelayMs);
 }
