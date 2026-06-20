@@ -374,8 +374,8 @@ class TerminalView {
         break;
       case 1:
         for (uint16_t row = 0; row <= cursor_row_; ++row) {
-          uint16_t start = row == cursor_row_ ? cursor_col_ + 1 : cols_;
-          for (uint16_t col = 0; col < start; ++col) {
+          uint16_t limit = row == cursor_row_ ? cursor_col_ + 1 : cols_;
+          for (uint16_t col = 0; col < limit; ++col) {
             clearCell(col, row);
           }
         }

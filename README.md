@@ -40,11 +40,11 @@ pio device monitor
 
 ## 調整ポイント
 
-- UART の速度変更: `/home/runner/work/EC-VVVF-soud/EC-VVVF-soud/src/main.cpp` の `kTargetBaudRate`
-- UART ピン変更: `/home/runner/work/EC-VVVF-soud/EC-VVVF-soud/src/main.cpp` の `kTargetRxPin` / `kTargetTxPin`
+- UART の速度変更: `src/main.cpp` の `kTargetBaudRate`
+- UART ピン変更: `src/main.cpp` の `kTargetRxPin` / `kTargetTxPin`
 - ローカルエコー無効化: `kLocalEcho = false`
 
 ## 注意
 
-- Elecrow 5-inch 系でも基板リビジョン差分があるため、表示やタッチが合わない場合は `/home/runner/work/EC-VVVF-soud/EC-VVVF-soud/include/LGFX_Elecrow_5inch.hpp` のピン設定を見直してください。
+- Elecrow 5-inch 系でも基板リビジョン差分があるため、表示やタッチが合わない場合は `include/LGFX_Elecrow_5inch.hpp` のピン設定を見直してください。
 - 現状は表示中心のシリアルモニタで、タッチキーボードは未実装です。
