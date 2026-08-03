@@ -77,9 +77,9 @@ ADC 値には簡易ローパスフィルタがかけられており、急な揺�
 
 ## ファイル構成
 
-- `/home/runner/work/EC-VVVF-soud/EC-VVVF-soud/README.md`  
+- `README.md`  
   このリポジトリの説明
-- `/home/runner/work/EC-VVVF-soud/EC-VVVF-soud/src/ec-vvvf-sound.py`  
+- `src/ec-vvvf-sound.py`  
   RP2040 上で動作するメインスクリプト
 
 ## 使い方
