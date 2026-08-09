@@ -62,7 +62,7 @@ adc_filtered = mascon_adc.read_u16()
 
 # デバッグ用：前回値（変化検知に使用）
 _dbg_prev_adc      = -1
-_dbg_prev_base_f   = -1.0
+_dbg_prev_base_f   = -1
 _dbg_prev_carrier_f= -1.0
 _dbg_prev_tri_dir  = 0
 
@@ -170,3 +170,6 @@ try:
 except KeyboardInterrupt:
     audio_out.deinit()
     print("停止しました")
+except Exception as e:
+    audio_out.deinit()
+    print("エラー:", e)
