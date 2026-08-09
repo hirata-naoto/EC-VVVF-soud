@@ -108,19 +108,19 @@ try:
         # ----------------------------------------------------------
         # B. キャリア（三角波）目標周波数の決定
         # ----------------------------------------------------------
-        # キャリア周波数：各区間境界で連続になるよう線形補間
-        # f=0〜25Hz: 1100Hz固定（低速域は高PWM周波数）
-        # f=25〜55Hz: 1100Hz→275Hz（線形降下）
-        # f=55〜95Hz: 275Hz→190Hz（線形降下）
-        # f≥95Hz: f×2.0Hz（比例）
+        # キャリア周波数：基底周波数帯ごとの段階的な倍率制御
+        # f<25Hz:  800 + f×12
+        # 25≤f<55Hz: f×9
+        # 55≤f<95Hz: f×5
+        # f≥95Hz:    f×3
         if current_base_f < 25.0:
-            target_carrier_f = 1100.0
+            target_carrier_f = 800.0 + (current_base_f * 12.0)
         elif current_base_f < 55.0:
-            target_carrier_f = 1100.0 - (current_base_f - 25.0) * (825.0 / 30.0)
+            target_carrier_f = current_base_f * 9.0
         elif current_base_f < 95.0:
-            target_carrier_f = 275.0 - (current_base_f - 55.0) * (85.0 / 40.0)
+            target_carrier_f = current_base_f * 5.0
         else:
-            target_carrier_f = current_base_f * 2.0
+            target_carrier_f = current_base_f * 3.0
 
         current_carrier_f += (target_carrier_f - current_carrier_f) * 0.05
 
