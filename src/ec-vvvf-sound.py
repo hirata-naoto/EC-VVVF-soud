@@ -62,7 +62,7 @@ adc_filtered = mascon_adc.read_u16()
 
 # デバッグ用：前回値（変化検知に使用）
 _dbg_prev_adc      = -1
-_dbg_prev_base_f   = -1.0
+_dbg_prev_base_f   = -1
 _dbg_prev_carrier_f= -1.0
 _dbg_prev_tri_dir  = 0
 
@@ -80,32 +80,37 @@ try:
         adc_filtered = adc_filtered * 0.8 + adc_raw * 0.2
 
         if adc_filtered < 25000:
+            # ブレーキ／停止ゾーン：基底周波数をゼロへ引き下げる
             target_base_f = 0.0
             change_rate   = 1.0
+            if current_base_f > target_base_f:
+                current_base_f = max(current_base_f - change_rate, target_base_f)
         elif adc_filtered > 40000:
+            # 力行ゾーン：ADC値に応じた目標周波数へ追従
             target_base_f = ((adc_filtered - 40000) / 25535.0) * 150.0
             change_rate   = 0.4
-        else:
-            target_base_f = current_base_f
-            change_rate   = 0.0
-
-        if change_rate > 0.0:
             if current_base_f < target_base_f:
                 current_base_f = min(current_base_f + change_rate, target_base_f)
             elif current_base_f > target_base_f:
                 current_base_f = max(current_base_f - change_rate, target_base_f)
+        # else: デッドゾーン（25000〜40000）は current_base_f を保持
 
         # ----------------------------------------------------------
         # B. キャリア（三角波）目標周波数の決定
         # ----------------------------------------------------------
+        # キャリア周波数：各区間境界で連続になるよう線形補間
+        # f=0〜25Hz: 1100Hz固定（低速域は高PWM周波数）
+        # f=25〜55Hz: 1100Hz→275Hz（線形降下）
+        # f=55〜95Hz: 275Hz→190Hz（線形降下）
+        # f≥95Hz: f×2.0Hz（比例）
         if current_base_f < 25.0:
-            target_carrier_f = 800.0 + (current_base_f * 12.0)
+            target_carrier_f = 1100.0
         elif current_base_f < 55.0:
-            target_carrier_f = current_base_f * 9.0
+            target_carrier_f = 1100.0 - (current_base_f - 25.0) * (825.0 / 30.0)
         elif current_base_f < 95.0:
-            target_carrier_f = current_base_f * 5.0
+            target_carrier_f = 275.0 - (current_base_f - 55.0) * (85.0 / 40.0)
         else:
-            target_carrier_f = current_base_f * 3.0
+            target_carrier_f = current_base_f * 2.0
 
         current_carrier_f += (target_carrier_f - current_carrier_f) * 0.05
 
@@ -170,3 +175,6 @@ try:
 except KeyboardInterrupt:
     audio_out.deinit()
     print("停止しました")
+except Exception as e:
+    audio_out.deinit()
+    print("エラー:", e)
