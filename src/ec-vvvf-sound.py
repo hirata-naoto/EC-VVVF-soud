@@ -46,6 +46,10 @@ for i in range(TABLE_SIZE):
 # ==========================================
 # [修正] CHUNK_SIZE を明示的にサンプルレート基準で計算（約20ms分）
 CHUNK_SIZE = SAMPLE_RATE // 50  # = 441サンプル
+BUFFER_SIZE = CHUNK_SIZE * 2
+buffer = bytearray(BUFFER_SIZE)
+SILENT_BUFFER = bytes(BUFFER_SIZE)
+# メインループ内で buffer を再代入しない（ヒープ再確保を防ぐ）
 
 current_base_f  = 0.0   # 現在の信号波（出力）周波数
 phase_base      = 0.0   # サイン波テーブル上の現在位相
@@ -119,8 +123,6 @@ try:
         # ----------------------------------------------------------
         # C. オーディオバッファ生成（SPWM：サイン波 vs 三角波の比較）
         # ----------------------------------------------------------
-        buffer = bytearray(CHUNK_SIZE * 2)
-
         if current_base_f > 0.5:
             # サイン波テーブルの1サンプルあたり進む量
             step_base = (TABLE_SIZE * current_base_f) / SAMPLE_RATE
@@ -156,8 +158,10 @@ try:
                 elif tri_val <= 0.0:
                     tri_val       = 0.0
                     tri_direction = 1
+        else:
+            buffer[:] = SILENT_BUFFER
 
-        # buffer は停車時ゼロ初期化のままなので無音になる
+        # 停車時は明示的にゼロ埋め済み
 
         # ----------------------------------------------------------
         # D. I2Sへ転送
