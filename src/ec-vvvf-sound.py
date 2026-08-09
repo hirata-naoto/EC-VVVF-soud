@@ -60,6 +60,12 @@ tri_direction = 1
 current_carrier_f = 800.0
 adc_filtered = mascon_adc.read_u16()
 
+# デバッグ用：前回値（変化検知に使用）
+_dbg_prev_adc      = -1
+_dbg_prev_base_f   = -1.0
+_dbg_prev_carrier_f= -1.0
+_dbg_prev_tri_dir  = 0
+
 print("【修正版・真SPWM】I2S VVVFシステム起動")
 
 # ==========================================
@@ -138,6 +144,28 @@ try:
         # D. I2Sへ転送
         # ----------------------------------------------------------
         audio_out.write(buffer)
+
+        # ----------------------------------------------------------
+        # E. デバッグ出力（変化があったときのみ）
+        # ----------------------------------------------------------
+        adc_int = int(adc_filtered)
+        base_f_int = int(current_base_f * 10)
+        carrier_f_int = int(current_carrier_f)
+        if (adc_int != _dbg_prev_adc or
+                base_f_int != _dbg_prev_base_f or
+                carrier_f_int != _dbg_prev_carrier_f or
+                tri_direction != _dbg_prev_tri_dir):
+            print(
+                "ADC={:5d} base_f={:5.1f}Hz carrier_f={:5.0f}Hz "
+                "tri_val={:.3f} tri_dir={:+d}".format(
+                    adc_int, current_base_f, current_carrier_f,
+                    tri_val, tri_direction
+                )
+            )
+            _dbg_prev_adc       = adc_int
+            _dbg_prev_base_f    = base_f_int
+            _dbg_prev_carrier_f = carrier_f_int
+            _dbg_prev_tri_dir   = tri_direction
 
 except KeyboardInterrupt:
     audio_out.deinit()
