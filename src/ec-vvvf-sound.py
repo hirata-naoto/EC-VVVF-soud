@@ -9,13 +9,13 @@ from machine import Pin, ADC, I2S
 SAMPLE_RATE = 22050
 
 # ==========================================
-# ポート・ピン番号の定数定義
+# ポート・ピン番号の定数定義（ESP32-C5用）
 # ==========================================
 I2S_PORT    = 0   # I2S ポート番号
-PIN_I2S_SCK = 2   # BCLK
-PIN_I2S_WS  = 3   # LRCK
-PIN_I2S_SD  = 4   # DIN
-PIN_MASCON  = 26  # マスコン ADC 入力
+PIN_I2S_SCK = 6   # BCLK
+PIN_I2S_WS  = 7   # LRCK
+PIN_I2S_SD  = 8   # DIN
+PIN_MASCON  = 4   # マスコン ADC 入力
 
 audio_out = I2S(
     I2S_PORT,
@@ -26,7 +26,7 @@ audio_out = I2S(
     bits=16,
     format=I2S.MONO,
     rate=SAMPLE_RATE,
-    ibuf=4096
+    ibuf=32768
 )
 
 mascon_adc = ADC(Pin(PIN_MASCON))
@@ -46,7 +46,7 @@ for i in range(TABLE_SIZE):
 # ==========================================
 # 3. 再生用変数の初期化
 # ==========================================
-CHUNK_SIZE = SAMPLE_RATE // 50  # = 441サンプル
+CHUNK_SIZE = SAMPLE_RATE // 10  # = 2205サンプル（バッファアンダーフロー対策）
 BUFFER_SIZE = CHUNK_SIZE * 2
 buffer = bytearray(BUFFER_SIZE)
 SILENT_BUFFER = bytes(BUFFER_SIZE)
@@ -66,7 +66,7 @@ _dbg_prev_base_f   = -1.0
 _dbg_prev_carrier_f= -1.0
 _dbg_prev_tri_dir  = 0
 
-print("【修正版・真SPWM】I2S VVVFシステム起動")
+print("【ESP32-C5対応版・真SPWM】I2S VVVFシステム起動")
 
 # ==========================================
 # 4. メインループ
