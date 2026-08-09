@@ -7,11 +7,20 @@ from machine import Pin, ADC, I2S
 # ==========================================
 SAMPLE_RATE = 22050
 
+# ==========================================
+# ポート・ピン番号の定数定義
+# ==========================================
+I2S_PORT    = 0   # I2S ポート番号
+PIN_I2S_SCK = 3   # BCLK
+PIN_I2S_WS  = 2   # LRCK
+PIN_I2S_SD  = 4   # DIN
+PIN_MASCON  = 26  # マスコン ADC 入力
+
 audio_out = I2S(
-    0,
-    sck=Pin(3),   # BCLK
-    ws=Pin(2),    # LRCK
-    sd=Pin(4),    # DIN
+    I2S_PORT,
+    sck=Pin(PIN_I2S_SCK),
+    ws=Pin(PIN_I2S_WS),
+    sd=Pin(PIN_I2S_SD),
     mode=I2S.TX,
     bits=16,
     format=I2S.MONO,
@@ -19,7 +28,7 @@ audio_out = I2S(
     ibuf=4096     # [修正] バッファを2048→4096に拡大して転送安定性を向上
 )
 
-mascon_adc = ADC(Pin(26))
+mascon_adc = ADC(Pin(PIN_MASCON))
 
 # ==========================================
 # 2. サイン波テーブル（信号波用）
