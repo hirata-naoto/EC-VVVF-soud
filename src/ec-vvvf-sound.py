@@ -127,24 +127,39 @@ try:
         # ----------------------------------------------------------
         # C. オーディオバッファ生成（SPWM）
         # ----------------------------------------------------------
+        # current_base_f が 0.5Hz を超えるときのみ、VVVF音を生成する。
+        # それ以下は停止相当とみなし、無音バッファをそのまま送る。
         if current_base_f > 0.5:
+            # step_base:
+            #   サイン波テーブル上を 1 サンプルごとにどれだけ進めるか。
+            #   基底周波数 current_base_f が高いほど進み幅が大きくなり、音程が上がる。
             step_base = (TABLE_SIZE * current_base_f) / SAMPLE_RATE
+            # step_tri:
+            #   三角波の現在値 tri_val(0.0〜1.0) の更新量。
+            #   0→1→0 の往復で 1 周期になるため 2.0 を掛ける。
             step_tri = (2.0 * current_carrier_f) / SAMPLE_RATE
 
             for i in range(CHUNK_SIZE):
                 # [修正] int16 テーブル値を -1.0〜1.0 に正規化して比較
                 sine_val = SINE_TABLE[int(phase_base) & TABLE_MASK] / SINE_SCALE
+                # tri_val は 0.0〜1.0 で保持しているので、比較用に -1.0〜1.0 へ変換
                 triangle_val = (tri_val * 2.0) - 1.0
 
+                # SPWM 比較:
+                # サイン波 > 三角波 の期間を HIGH、その他を LOW にして
+                # 疑似PWM波形（VVVFインバータ風の音源）を作る。
                 if sine_val > triangle_val:
                     sample = 12000
                 else:
                     sample = -12000
 
+                # 16bit 符号付き little-endian でバッファへ格納（モノラル）
                 struct.pack_into('<h', buffer, i * 2, sample)
 
+                # サイン波位相を進める（テーブル末尾を超えたら先頭へ循環）
                 phase_base = (phase_base + step_base) % TABLE_SIZE
 
+                # 三角波を現在方向に進め、端に達したら折り返す
                 tri_val += step_tri * tri_direction
                 if tri_val >= 1.0:
                     tri_val       = 1.0
@@ -153,6 +168,7 @@ try:
                     tri_val       = 0.0
                     tri_direction = 1
         else:
+            # 停止時は前回音を残さないよう、バッファ全体を無音で上書き
             buffer[:] = SILENT_BUFFER
 
         # ----------------------------------------------------------
