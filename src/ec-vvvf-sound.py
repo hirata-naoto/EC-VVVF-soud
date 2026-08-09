@@ -10,13 +10,17 @@ from machine import Pin, ADC, I2S
 SAMPLE_RATE = 22050
 
 # ==========================================
-# ポート・ピン番号の定数定義（ESP32-C5用）
+# ポート・ピン番号の定数定義（Seeed XIAO ESP32C5用）
 # ==========================================
-I2S_PORT    = 0   # I2S ポート番号
-PIN_I2S_SCK = 6   # BCLK
-PIN_I2S_WS  = 7   # LRCK
-PIN_I2S_SD  = 8   # DIN
-PIN_MASCON  = 4   # マスコン ADC 入力
+# D8 (GPIO8)  : I2S BCLK
+# D1 (GPIO0)  : I2S LRCK
+# D6 (GPIO11) : I2S DIN
+# D0 (GPIO1)  : マスコン ADC 入力（ADC1対応）
+I2S_PORT    = 0    # I2S ポート番号
+PIN_I2S_SCK = 8    # BCLK  → D8 (GPIO8)
+PIN_I2S_WS  = 0    # LRCK  → D1 (GPIO0)
+PIN_I2S_SD  = 11   # DIN   → D6 (GPIO11)
+PIN_MASCON  = 1    # マスコン ADC 入力 → D0 (GPIO1)
 
 audio_out = I2S(
     I2S_PORT,
@@ -72,7 +76,7 @@ _dbg_prev_base_f   = -1
 _dbg_prev_carrier_f= -1.0
 _dbg_prev_tri_dir  = 0
 
-print("【ESP32-C5対応版・真SPWM】I2S VVVFシステム起動")
+print("【Seeed XIAO ESP32C5対応版・真SPWM】I2S VVVFシステム起動")
 
 # ==========================================
 # 4. メインループ
