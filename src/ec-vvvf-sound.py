@@ -3,6 +3,7 @@ import struct
 from array import array
 from machine import Pin, ADC, I2S
 
+# esp32c5 電車のVVVFインバータ音再現
 # ==========================================
 # 1. I2S・ハードウェアの初期設定
 # ==========================================
