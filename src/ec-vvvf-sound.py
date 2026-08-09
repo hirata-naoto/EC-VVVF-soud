@@ -31,6 +31,7 @@ audio_out = I2S(
 )
 
 mascon_adc = ADC(Pin(PIN_MASCON))
+mascon_adc.atten(ADC.ATTN_11DB)
 
 # ==========================================
 # 2. サイン波テーブル（信号波用）
