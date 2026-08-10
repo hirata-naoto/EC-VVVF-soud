@@ -35,6 +35,7 @@ static const int TABLE_SIZE = 1024;
 static const int TABLE_MASK = TABLE_SIZE - 1;
 static const int SINE_SCALE = 32767;
 static int16_t SINE_TABLE[TABLE_SIZE];
+static float   SINE_TABLE_NORM[TABLE_SIZE];  // -1.0〜1.0 に正規化済み（setup時に初期化）
 
 // ==========================================
 // 3. バッファ
@@ -94,9 +95,10 @@ void setup() {
     Serial.begin(115200);
     delay(500);
 
-    // サイン波テーブル生成
+    // サイン波テーブル生成（整数テーブルと正規化済みfloatテーブルを同時に構築）
     for (int i = 0; i < TABLE_SIZE; i++) {
-        SINE_TABLE[i] = (int16_t)(sinf(2.0f * (float)M_PI * i / TABLE_SIZE) * SINE_SCALE);
+        SINE_TABLE[i]      = (int16_t)(sinf(2.0f * (float)M_PI * i / TABLE_SIZE) * SINE_SCALE);
+        SINE_TABLE_NORM[i] = (float)SINE_TABLE[i] / (float)SINE_SCALE;
     }
 
     // ADC 設定（12bit、フル電圧レンジ）
@@ -185,8 +187,8 @@ void loop() {
         float step_tri  = (2.0f * current_carrier_f) / (float)SAMPLE_RATE;
 
         for (int i = 0; i < CHUNK_SIZE; i++) {
-            // [修正] int16 テーブル値を -1.0〜1.0 に正規化して比較
-            float sine_val    = (float)SINE_TABLE[(int)phase_base & TABLE_MASK] / (float)SINE_SCALE;
+            // 正規化済みテーブルから直接参照（ループ内の除算を削除）
+            float sine_val    = SINE_TABLE_NORM[(int)phase_base & TABLE_MASK];
             // tri_val は 0.0〜1.0 で保持しているので、比較用に -1.0〜1.0 へ変換
             float triangle_val = (tri_val * 2.0f) - 1.0f;
 
@@ -200,7 +202,10 @@ void loop() {
             audio_buffer[i * 2 + 1] = (uint8_t)((sample >> 8) & 0xFF);
 
             // サイン波位相を進める（テーブル末尾を超えたら先頭へ循環）
-            phase_base = fmodf(phase_base + step_base, (float)TABLE_SIZE);
+            phase_base += step_base;
+            while (phase_base >= (float)TABLE_SIZE) {
+                phase_base -= (float)TABLE_SIZE;
+            }
 
             // 三角波を現在方向に進め、端に達したら折り返す
             tri_val += step_tri * (float)tri_direction;
