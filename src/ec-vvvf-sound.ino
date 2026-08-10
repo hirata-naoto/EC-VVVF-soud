@@ -50,8 +50,8 @@ static const float LOOP_DT = (float)CHUNK_SIZE / (float)SAMPLE_RATE;
 // 3x. 応答性パラメータ（すべて1秒当たり）
 // ==========================================
 // 加減速レート（Hz/秒）
-// 実写寄りに早くしたい場合はここを大きくする
-static const float BREAK_RATE_HZ_PER_SEC = 10.0f;
+// 実車寄りに早くしたい場合はここを大きくする
+static const float BRAKE_RATE_HZ_PER_SEC = 10.0f;
 static const float POWER_RATE_HZ_PER_SEC =  4.0f;
 
 // ADCフィルタとキャリア追従の時定数（秒）。値を小さくするほど反応が早く、
@@ -152,7 +152,7 @@ void loop() {
     if (adc_filtered < 25000.0f) {
         // ブレーキ／停止ゾーン
         float target_base_f = 0.0f;
-        float change_rate   = BRAKE_RAT_HZ_PER_SEC * LOOP_DT;
+        float change_rate   = BRAKE_RATE_HZ_PER_SEC * LOOP_DT;
         if (current_base_f > target_base_f) {
             current_base_f -= change_rate;
             if (current_base_f < target_base_f) current_base_f = target_base_f;
