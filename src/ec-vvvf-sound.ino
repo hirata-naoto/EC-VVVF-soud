@@ -33,7 +33,6 @@ static const i2s_port_t I2S_PORT = I2S_NUM_0;
 // ==========================================
 static const int TABLE_SIZE = 1024;
 static const int TABLE_MASK = TABLE_SIZE - 1;
-static const int SINE_SCALE = 32767;
 static float   SINE_TABLE_NORM[TABLE_SIZE];  // -1.0〜1.0 に正規化済み（setup時に初期化）
 
 // ==========================================
@@ -96,7 +95,7 @@ void setup() {
 
     // サイン波テーブル生成（整数テーブルと正規化済みfloatテーブルを同時に構築）
     for (int i = 0; i < TABLE_SIZE; i++) {
-        SINE_TABLE_NORM[i] = (float)SINE_TABLE[i] / (float)SINE_SCALE;
+        SINE_TABLE_NORM[i] = (float)(sinf(2.0f * (float)M_PI * i / TABLE_SIZE));
     }
 
     // ADC 設定（12bit、フル電圧レンジ）
