@@ -96,6 +96,14 @@ static int   tri_direction     = 1;
 static float current_carrier_f = 800.0f;
 static float adc_filtered      = 0.0f;
 
+// Low Pass Filter
+static float lpf_state  = 0.0f;
+static float lpf_state2 = 0.0f;
+// ザラザラが残る場合はカットオフ周波数を下げる
+// こもって聞こえる場合は上げる
+static const float LPF_CUTOFF_HZ = 3000.0f;
+static const float LPF_ALPHA = 1.0f - expf(-2.0f*(float)M_PI * LPF_CUTOFF_HZ / (float)SAMPLE_RATE);
+
 // デバッグ用（変化検知）
 static int   _dbg_prev_adc       = -1;
 static int   _dbg_prev_base_f    = -1;
@@ -247,7 +255,14 @@ void loop() {
             // SPWM 比較:
             // サイン波 > 三角波 の期間を HIGH、その他を LOW にして
             // 疑似PWM波形（VVVFインバータ風の音源）を作る。
-            int16_t sample = (sine_val > triangle_val) ? 12000 : -12000;
+            int16_t raw_sample = (sine_val > triangle_val) ? 15000 : -15000;
+
+            // モーターのインダクタンスによる鈍りを再現するローパスフィルタ
+            // 1段階目のLPF
+            lpf_state += LPF_ALPHA * ((float)raw_sample - lpf_state);
+            // 2段階目でさらに滑らかにする（高域のジャリジャリ感を消す）
+            lpf_state2 += LPF_ALPHA * (lpf_state - lpf_state2);
+            int16_t sample = (int16_t)lpf_state2;
 
             // 16bit little-endian でバッファへ格納（モノラル）
             audio_buffer[i * 2]     = (uint8_t)(sample & 0xFF);
