@@ -38,9 +38,29 @@ static float   SINE_TABLE_NORM[TABLE_SIZE];  // -1.0〜1.0 に正規化済み（
 // ==========================================
 // 3. バッファ
 // ==========================================
-static const int CHUNK_SIZE   = SAMPLE_RATE / 10;   // 2205 サンプル
+static const int CHUNK_SIZE   = SAMPLE_RATE / 50;   // 441 サンプル
 static const int BUFFER_SIZE  = CHUNK_SIZE * 2;      // バイト数（16bit mono）
 static uint8_t audio_buffer[BUFFER_SIZE];
+
+// 1ループ当たりの実時間（秒）。レート計算をこれに基づかせることで、
+// チャンクサイズを変えても実時間ベースの挙動を維持できる。
+static const float LOOP_DT = (float)CHUNK_SIZE / (float)SAMPLE_RATE;
+
+// ==========================================
+// 3x. 応答性パラメータ（すべて1秒当たり）
+// ==========================================
+// 加減速レート（Hz/秒）
+// 実写寄りに早くしたい場合はここを大きくする
+static const float BREAK_RATE_HZ_PER_SEC = 10.0f;
+static const float POWER_RATE_HZ_PER_SEC =  4.0f;
+
+// ADCフィルタとキャリア追従の時定数（秒）。値を小さくするほど反応が早く、
+// 大きくするほど滑らかだが遅くなる。20msチャンクでも一定の応答性を保つため
+// alphaをループ周期から逆算する
+static const float ADC_FILTER_TAU     = 0.15f;
+static const float CARRIER_FILTER_TAU = 0.15f;
+static const float ADC_ALPHA     = LOOP_DT / (ADC_FILTER_TAU     + LOOP_DT);
+static const float CARRIER_ALPHA = LOOP_DT / (CARRIER_FILTER_TAU + LOOP_DT);
 
 // ==========================================
 // 4. 再生用変数
@@ -69,8 +89,8 @@ static void i2s_init() {
         .channel_format       = I2S_CHANNEL_FMT_ONLY_LEFT,  // MONO
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
         .intr_alloc_flags     = ESP_INTR_FLAG_LEVEL1,
-        .dma_buf_count        = 8,
-        .dma_buf_len          = 512,
+        .dma_buf_count        = 4,
+        .dma_buf_len          = 128,
         .use_apll             = false,
         .tx_desc_auto_clear   = true,
         .fixed_mclk           = 0
@@ -126,12 +146,13 @@ void loop() {
     adc_raw_12 = constrain(corrected_val, 0, 4095);
     float adc_raw  = (float)adc_raw_12 * (65535.0f / 4095.0f);
 
-    adc_filtered = adc_filtered * 0.8f + adc_raw * 0.2f;
+    // 時定数ベースのローパスフィルタ（ループ周期が変わっても応答性は一緒）
+    adc_filtered = adc_filtered * (1.0f-ADC_ALPHA) + adc_raw * ADC_ALPHA;
 
     if (adc_filtered < 25000.0f) {
         // ブレーキ／停止ゾーン
         float target_base_f = 0.0f;
-        float change_rate   = 1.0f;
+        float change_rate   = BRAKE_RAT_HZ_PER_SEC * LOOP_DT;
         if (current_base_f > target_base_f) {
             current_base_f -= change_rate;
             if (current_base_f < target_base_f) current_base_f = target_base_f;
@@ -139,7 +160,7 @@ void loop() {
     } else if (adc_filtered > 40000.0f) {
         // 力行ゾーン
         float target_base_f = ((adc_filtered - 40000.0f) / 25535.0f) * 150.0f;
-        float change_rate   = 0.4f;
+        float change_rate   = POWER_RATE_HZ_PER_SEC * LOOP_DT;
         if (current_base_f < target_base_f) {
             current_base_f += change_rate;
             if (current_base_f > target_base_f) current_base_f = target_base_f;
