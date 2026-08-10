@@ -63,6 +63,30 @@ static const float ADC_ALPHA     = LOOP_DT / (ADC_FILTER_TAU     + LOOP_DT);
 static const float CARRIER_ALPHA = LOOP_DT / (CARRIER_FILTER_TAU + LOOP_DT);
 
 // ==========================================
+// 3xx. Siemns ドレミファインバータ
+// ==========================================
+// 加減速レート（Hz/秒）
+static const int   DOREMIFA_NOTE_COUNT = 9;
+static const float DOREMIFA_NOTES[DOREMIFA_NOTE_COUNT] = {
+    174.61f,    // F3
+    196.00f,    // G3
+    220.00f,    // A3
+    233.08f,    // Bb3
+    261.63f,    // C4
+    293.66f,    // D4
+    311.13f,    // Eb4
+    349.23f,    // F4
+    392.00f,    // G4
+};
+
+// 音階が鳴る規定周波数の上限周波数
+static const float DOREMIFA_MAX_BASE_F = 25.0f;
+
+// ドレミファ区間だけキャリア追従の時定数を短くして瞬時に切り替える
+static const float DOREMIFA_CARRIER_TAU = 0.03f;
+static const float DOREMIFA_CARRIER_ALPHA = LOOP_DT / (DOREMIFA_CARRIER_TAU + LOOP_DT);
+
+// ==========================================
 // 4. 再生用変数
 // ==========================================
 static float current_base_f   = 0.0f;
@@ -180,8 +204,14 @@ void loop() {
     // 55≤f<95Hz: f×5
     // f≥95Hz:    f×3
     float target_carrier_f;
+    bool in_doremifa_zone = (current_base_f < DOREMIFA_MAX_BASE_F);
+
     if (current_base_f < 25.0f) {
-        target_carrier_f = 800.0f + (current_base_f * 12.0f);
+        // Not Siemens DoReMiFa; target_carrier_f = 800.0f + (current_base_f * 12.0f);
+        int note_index = (int)(current_base_f / (DOREMIFA_MAX_BASE_F / (float)DOREMIFA_NOTE_COUNT));
+        if (note_index >= DOREMIFA_NOTE_COUNT) note_index = DOREMIFA_NOTE_COUNT - 1;
+        if (note_index < 0) note_index = 0;
+        target_carrier_f = DOREMIFA_NOTES[note_index];
     } else if (current_base_f < 55.0f) {
         target_carrier_f = current_base_f * 9.0f;
     } else if (current_base_f < 95.0f) {
@@ -190,7 +220,8 @@ void loop() {
         target_carrier_f = current_base_f * 3.0f;
     }
 
-    current_carrier_f += (target_carrier_f - current_carrier_f) * 0.05f;
+    float carrier_alpha = in_doremifa_zone ? DOREMIFA_CARRIER_ALPHA : CARRIER_ALPHA;
+    current_carrier_f += (target_carrier_f - current_carrier_f) * carrier_alpha;
 
     // ----------------------------------------------------------
     // C. オーディオバッファ生成（SPWM）
