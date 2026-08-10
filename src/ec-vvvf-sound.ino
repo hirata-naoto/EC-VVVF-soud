@@ -5,16 +5,28 @@
 // 必要ライブラリ:
 //   ESP32-audioI2S (またはArduinoのI2Sライブラリ)
 //   Arduino IDE のボードマネージャで "esp32 by Espressif" をインストール
+//   Adafruit_GFX / Adafruit_SSD1306（OLEDを使う場合）
 //
 // ピン配置:
 //   D8 (GPIO8)  : I2S BCLK (SCK)
 //   D1 (GPIO0)  : I2S LRCK (WS)
 //   D6 (GPIO11) : I2S DIN  (SD)
 //   D0 (GPIO1)  : マスコン ADC 入力
+//   D4 (GPIO23) : I2C SDA (SSD1306 128x64 OLED)
+//   D5 (GPIO24) : I2C SCL (SSD1306 128x64 OLED)
 
 #include <Arduino.h>
 #include <driver/i2s.h>
 #include <math.h>
+#include <Wire.h>
+
+#if __has_include(<Adafruit_GFX.h>) && __has_include(<Adafruit_SSD1306.h>)
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define EC_VVVF_HAS_OLED 1
+#else
+#define EC_VVVF_HAS_OLED 0
+#endif
 
 // ==========================================
 // 1. ハードウェア定数
@@ -25,6 +37,13 @@ static const gpio_num_t PIN_I2S_SCK = GPIO_NUM_8;   // BCLK
 static const gpio_num_t PIN_I2S_WS  = GPIO_NUM_0;   // LRCK
 static const gpio_num_t PIN_I2S_SD  = GPIO_NUM_11;  // DIN
 static const int        PIN_MASCON  = 1;             // ADC GPIO1
+static const int        PIN_I2C_SDA = 23;            // XIAO D4
+static const int        PIN_I2C_SCL = 24;            // XIAO D5
+
+static const uint8_t OLED_I2C_ADDRESS         = 0x3C;
+static const int     OLED_WIDTH               = 128;
+static const int     OLED_HEIGHT              = 64;
+static const uint32_t OLED_UPDATE_INTERVAL_MS = 100;
 
 static const i2s_port_t I2S_PORT = I2S_NUM_0;
 
@@ -78,6 +97,80 @@ static int   _dbg_prev_base_f    = -1;
 static int   _dbg_prev_carrier_f = -1;
 static int   _dbg_prev_tri_dir   = 0;
 
+#if EC_VVVF_HAS_OLED
+static Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
+static bool oled_ready = false;
+#endif
+static uint32_t last_oled_update_ms = 0;
+
+static const char* get_operating_state() {
+    if (adc_filtered > 40000.0f) {
+        return "POWERING";
+    }
+    if (adc_filtered < 25000.0f) {
+        return (current_base_f > 0.5f) ? "BRAKING" : "STOPPED";
+    }
+    return "COASTING";
+}
+
+#if EC_VVVF_HAS_OLED
+static void oled_init() {
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+    Wire.setClock(400000);
+
+    oled_ready = display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDRESS);
+    if (!oled_ready) {
+        Serial.println("SSD1306 OLED init failed. Continuing without display.");
+        return;
+    }
+
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setTextWrap(false);
+    display.setCursor(0, 0);
+    display.println("EC-VVVF OLED READY");
+    display.display();
+}
+
+static void oled_update_if_due(int adc_raw_12) {
+    if (!oled_ready) {
+        return;
+    }
+
+    uint32_t now = millis();
+    if ((now - last_oled_update_ms) < OLED_UPDATE_INTERVAL_MS) {
+        return;
+    }
+    last_oled_update_ms = now;
+
+    int bar_width = (adc_raw_12 * (OLED_WIDTH - 2)) / 4095;
+
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.print("STATE: ");
+    display.println(get_operating_state());
+    display.print("BASE : ");
+    display.print(current_base_f, 1);
+    display.println(" Hz");
+    display.print("CARR : ");
+    display.print(current_carrier_f, 0);
+    display.println(" Hz");
+    display.print("ADC  : ");
+    display.print(adc_raw_12);
+    display.println(" / 4095");
+    display.print("FILT : ");
+    display.print(adc_filtered, 0);
+    display.println(" / 65535");
+    display.drawRect(0, 54, OLED_WIDTH, 10, SSD1306_WHITE);
+    display.fillRect(1, 55, bar_width, 8, SSD1306_WHITE);
+    display.display();
+}
+#else
+static void oled_init() {}
+static void oled_update_if_due(int) {}
+#endif
+
 // ==========================================
 // 5. I2S 初期化
 // ==========================================
@@ -127,6 +220,9 @@ void setup() {
 
     // I2S 初期化
     i2s_init();
+
+    // OLED 初期化（ライブラリ未導入時や未接続時は自動で無効化）
+    oled_init();
 
     Serial.println("【Seeed XIAO ESP32C5対応版・真SPWM】I2S VVVFシステム起動");
 }
@@ -250,7 +346,12 @@ void loop() {
     i2s_write(I2S_PORT, audio_buffer, BUFFER_SIZE, &bytes_written, portMAX_DELAY);
 
     // ----------------------------------------------------------
-    // E. デバッグ出力（変化があったときのみ）
+    // E. OLED 表示更新（I2S負荷を避けるため約100ms周期）
+    // ----------------------------------------------------------
+    oled_update_if_due(adc_raw_12);
+
+    // ----------------------------------------------------------
+    // F. デバッグ出力（変化があったときのみ）
     // ----------------------------------------------------------
     int adc_int      = (int)adc_filtered;
     int base_f_int   = (int)(current_base_f * 10.0f);
