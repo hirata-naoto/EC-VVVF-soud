@@ -151,6 +151,11 @@ void loop() {
     // ----------------------------------------------------------
     // B. キャリア（三角波）目標周波数の決定
     // ----------------------------------------------------------
+    // キャリア周波数：基底周波数帯ごとの段階的な倍率制御
+    // f<25Hz:  800 + f×12
+    // 25≤f<55Hz: f×9
+    // 55≤f<95Hz: f×5
+    // f≥95Hz:    f×3
     float target_carrier_f;
     if (current_base_f < 25.0f) {
         target_carrier_f = 800.0f + (current_base_f * 12.0f);
@@ -167,22 +172,37 @@ void loop() {
     // ----------------------------------------------------------
     // C. オーディオバッファ生成（SPWM）
     // ----------------------------------------------------------
+    // current_base_f が 0.5Hz を超えるときのみ、VVVF音を生成する。
+    // それ以下は停止相当とみなし、無音バッファをそのまま送る。
     if (current_base_f > 0.5f) {
+        // step_base:
+        //   サイン波テーブル上を 1 サンプルごとにどれだけ進めるか。
+        //   基底周波数 current_base_f が高いほど進み幅が大きくなり、音程が上がる。
         float step_base = ((float)TABLE_SIZE * current_base_f) / (float)SAMPLE_RATE;
+        // step_tri:
+        //   三角波の現在値 tri_val(0.0〜1.0) の更新量。
+        //   0→1→0 の往復で 1 周期になるため 2.0 を掛ける。
         float step_tri  = (2.0f * current_carrier_f) / (float)SAMPLE_RATE;
 
         for (int i = 0; i < CHUNK_SIZE; i++) {
+            // [修正] int16 テーブル値を -1.0〜1.0 に正規化して比較
             float sine_val    = (float)SINE_TABLE[(int)phase_base & TABLE_MASK] / (float)SINE_SCALE;
+            // tri_val は 0.0〜1.0 で保持しているので、比較用に -1.0〜1.0 へ変換
             float triangle_val = (tri_val * 2.0f) - 1.0f;
 
+            // SPWM 比較:
+            // サイン波 > 三角波 の期間を HIGH、その他を LOW にして
+            // 疑似PWM波形（VVVFインバータ風の音源）を作る。
             int16_t sample = (sine_val > triangle_val) ? 12000 : -12000;
 
             // 16bit little-endian でバッファへ格納（モノラル）
             audio_buffer[i * 2]     = (uint8_t)(sample & 0xFF);
             audio_buffer[i * 2 + 1] = (uint8_t)((sample >> 8) & 0xFF);
 
+            // サイン波位相を進める（テーブル末尾を超えたら先頭へ循環）
             phase_base = fmodf(phase_base + step_base, (float)TABLE_SIZE);
 
+            // 三角波を現在方向に進め、端に達したら折り返す
             tri_val += step_tri * (float)tri_direction;
             if (tri_val >= 1.0f) {
                 tri_val       = 1.0f;
