@@ -103,7 +103,7 @@ void setup() {
 
     // ADC 設定（12bit、フル電圧レンジ）
     analogReadResolution(12);
-    analogSetAttenuation(ADC_11db);  // 0〜3.3V
+    analogSetPinAttenuation(PIN_MASCON, ADC_11db);  // 0〜3.3V
 
     // ADC 初期値取得
     adc_filtered = (float)analogRead(PIN_MASCON);
@@ -123,7 +123,10 @@ void loop() {
     // ----------------------------------------------------------
     // MicroPython の read_u16() (0〜65535) に合わせて
     // Arduino の 12bit ADC (0〜4095) を 16bit スケールへ変換する
+    // adc読み込み値が4095まで上がらないので、強制的にmap, constrainで0～4095にマッピング
     int adc_raw_12 = analogRead(PIN_MASCON);
+    int corrected_val = map(adc_raw_12, 0, 3300, 0, 4095);
+    adc_raw_12 = constrain(corrected_val, 0, 4095);
     float adc_raw  = (float)adc_raw_12 * (65535.0f / 4095.0f);
 
     adc_filtered = adc_filtered * 0.8f + adc_raw * 0.2f;
